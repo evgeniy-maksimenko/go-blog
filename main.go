@@ -22,7 +22,8 @@ func indexHandler(rnd render.Render) {
 }
 
 func writeHandler(rnd render.Render) {
-	rnd.HTML(200, "write", nil)
+	post := models.Post{}
+	rnd.HTML(200, "write", post)
 }
 
 func editHandler(rnd render.Render, r *http.Request, params martini.Params) {
