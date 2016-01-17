@@ -14,6 +14,7 @@ const (
 type Session struct {
 	id       string
 	Username string
+	IsAuth   bool
 }
 
 type SessionStore struct {
