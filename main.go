@@ -1,25 +1,57 @@
 package main
 
 import (
-	"fmt"
-	"html/template"
-	"net/http"
-
-	"github.com/codegangsta/martini"
+	"./db/documents"
 	"./models"
 	"./utils"
-	"./db/documents"
+	"fmt"
+	"github.com/codegangsta/martini"
 	"github.com/martini-contrib/render"
 	"gopkg.in/mgo.v2"
-
+	"html/template"
+	"net/http"
+	"./session"
+	"time"
 )
 
+const (
+	COOKIE_NAME = "sessionId"
+)
 
 var postsCollection *mgo.Collection
 var counter int
+var inMemorySession *session.Session
 
 
-func indexHandler(rnd render.Render) {
+func getLoginHandler(rnd render.Render) {
+	rnd.HTML(200, "login", nil)
+}
+
+
+func postLoginHandler(rnd render.Render, r *http.Request, w http.ResponseWriter) {
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+
+	fmt.Println(password)
+
+	sessionId := inMemorySession.Init(username)
+	cookie := &http.Cookie{
+		Name: COOKIE_NAME,
+		Value:sessionId,
+		Expires:time.Now().Add(5*time.Minute),
+	}
+
+	http.SetCookie(w, cookie)
+
+	rnd.Redirect("/")
+}
+
+func indexHandler(rnd render.Render, r *http.Request) {
+	cookie, _ := r.Cookie(COOKIE_NAME)
+	if cookie != nil {
+		fmt.Println(inMemorySession.Get(cookie.Value))
+	}
+
 	postDocuments := []documents.PostDocument{}
 	postsCollection.Find(nil).All(&postDocuments)
 
@@ -93,12 +125,13 @@ func unescape(x string) interface{} {
 func main() {
 	fmt.Println("Listening on port :3000")
 
+	inMemorySession = session.NewSession()
+
 	session, err := mgo.Dial("localhost")
 	if err != nil {
 		panic(err)
 	}
 	postsCollection = session.DB("blog").C("posts")
-
 
 	m := martini.Classic()
 
@@ -117,11 +150,14 @@ func main() {
 	m.Use(martini.Static("assets", staticOptions))
 
 	m.Get("/", indexHandler)
+	m.Get("/login", getLoginHandler)
+	m.Post("/login", postLoginHandler)
 	m.Get("/write", writeHandler)
 	m.Get("/edit/:id", editHandler)
 	m.Get("/delete/:id", deleteHandler)
 	m.Post("/SavePost", savePostHandler)
 	m.Post("/gethtml", getHtmlHandler)
+
 
 	m.Run()
 }
